@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>스마트 순찰 시스템</title>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --danger-color: #e74c3c;
+            --warning-color: #f1c40f;
+            --success-color: #27ae60;
+        }
+        body {
+            font-family: 'Pretendard', -apple-system, sans-serif;
+            margin: 0; padding: 20px;
+            background-color: #f4f7f6;
+            display: flex; flex-direction: column; align-items: center;
+        }
+        .container {
+            width: 100%; max-width: 500px;
+            background: white; border-radius: 15px;
+            padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            text-align: center; position: relative;
+        }
+
+        /* 권한 안내 오버레이 */
+        #permission-guide {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); color: white;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 1000; padding: 30px; box-sizing: border-box;
+            text-align: center;
+        }
+        .guide-box { background: white; color: #333; padding: 25px; border-radius: 20px; width: 100%; }
+        .guide-icon { font-size: 50px; margin-bottom: 10px; }
+        .highlight { color: var(--danger-color); font-weight: bold; }
+
+        #status-bar { background: #eee; padding: 12px; border-radius: 8px; margin-bottom: 15px; font-weight: bold; }
+        
+        #camera-container {
+            width: 100%; height: 350px; background: #000;
+            border-radius: 10px; overflow: hidden; margin-bottom: 15px;
+            position: relative; border: 3px solid #ddd;
+        }
+        video { width: 100%; height: 100%; object-fit: cover; }
+        
+        .btn {
+            width: 100%; padding: 18px; margin: 8px 0; border: none;
+            border-radius: 10px; font-size: 18px; font-weight: bold;
+            cursor: pointer; transition: 0.2s;
+        }
+        .btn:active { opacity: 0.8; transform: scale(0.98); }
+        .btn-start { background: var(--success-color); color: white; }
+        .btn-end { background: var(--primary-color); color: white; display: none; }
+        .btn-112 { background: var(--danger-color); color: white; flex: 1; }
+        .btn-120 { background: var(--warning-color); color: #333; flex: 1; }
+
+        #timer { font-size: 32px; font-weight: bold; margin: 10px 0; color: var(--danger-color); display: none; }
+        .preview-img { width: 100%; margin-top: 15px; border-radius: 10px; display: none; border: 2px solid #27ae60; }
+        
+        hr { border: 0; border-top: 1px solid #eee; margin: 20px 0; }
+    </style>
+</head>
+<body>
+
+<div id="permission-guide">
+    <div class="guide-box">
+        <div class="guide-icon">📸</div>
+        <h3>카메라 권한 허용 안내</h3>
+        <p>순찰 사진 인증을 위해 카메라 권한이 필요합니다.</p>
+        <p class="highlight">"최초 1회만 허용하면<br>다음부터는 자동으로 실행됩니다."</p>
+        <button onclick="requestCamera()" class="btn btn-start" style="margin-top:20px;">권한 허용하기</button>
+        <p style="font-size: 12px; color: #888; margin-top: 15px;">팝업창이 뜨면 반드시 [허용]을 눌러주세요.</p>
+    </div>
+</div>
+
+<div class="container">
+    <h2>🚨 스마트 순찰</h2>
+    
+    <div id="status-bar">상태: 권한 대기 중</div>
+    <div id="timer">00:00:00</div>
+
+    <div id="camera-container">
+        <video id="video" autoplay playsinline></video>
+        <canvas id="canvas" style="display:none;"></canvas>
+    </div>
+
+    <button id="start-btn" class="btn btn-start" onclick="onStartPatrol()">순찰 시작 (인증 촬영)</button>
+    <button id="end-btn" class="btn btn-end" onclick="onEndPatrol()">순찰 종료 (인증 촬영)</button>
+
+    <div style="display: flex; gap: 10px; margin-top: 10px;">
+        <button onclick="location.href='tel:112'" class="btn btn-112">112 신고</button>
+        <button onclick="location.href='tel:120'" class="btn btn-120">120 민원</button>
+    </div>
+
+    <img id="photo-preview" class="preview-img" alt="인증샷 미리보기">
+</div>
+
+<script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const startBtn = document.getElementById('start-btn');
+    const endBtn = document.getElementById('end-btn');
+    const timerDisplay = document.getElementById('timer');
+    const statusDisplay = document.getElementById('status-bar');
+    const photoPreview = document.getElementById('photo-preview');
+    const guide = document.getElementById('permission-guide');
+
+    let startTime;
+    let timerInterval;
+
+    // 카메라 권한 요청 함수
+    async function requestCamera() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: "environment" } 
+            });
+            video.srcObject = stream;
+            // 권한 허용 시 안내 레이어 숨김
+            guide.style.display = 'none';
+            statusDisplay.innerText = "상태: 순찰 준비 완료";
+        } catch (err) {
+            console.error(err);
+            alert("카메라 권한이 거부되었습니다. 주소창의 자물쇠 아이콘을 눌러 권한을 다시 허용해주세요.");
+        }
+    }
+
+    // 순찰 시작
+    function onStartPatrol() {
+        if (!video.srcObject) {
+            alert("카메라가 활성화되지 않았습니다.");
+            return;
+        }
+        capturePhoto("순찰시작");
+        startTimer();
+        startBtn.style.display = 'none';
+        endBtn.style.display = 'block';
+        statusDisplay.innerText = "상태: 순찰 진행 중";
+        statusDisplay.style.color = "red";
+    }
+
+    // 순찰 종료
+    function onEndPatrol() {
+        capturePhoto("순찰종료");
+        clearInterval(timerInterval);
+        alert(`순찰이 안전하게 종료되었습니다!\n총 소요시간: ${timerDisplay.innerText}`);
+        endBtn.style.display = 'none';
+        startBtn.style.display = 'block';
+        statusDisplay.innerText = "상태: 순찰 완료";
+        statusDisplay.style.color = "blue";
+    }
+
+    // 사진 촬영 및 시간 합성
+    function capturePhoto(label) {
+        const context = canvas.getContext('2d');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        const now = new Date();
+        const dateStr = `${now.getFullYear()}-${(now.getMonth()+1).toString().padStart(2,'0')}-${now.getDate().toString().padStart(2,'0')}`;
+        const timeStr = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
+        const fullText = `${label} [${dateStr} ${timeStr}]`;
+        
+        context.font = "bold 24px sans-serif";
+        context.fillStyle = "yellow";
+        context.strokeStyle = "black";
+        context.lineWidth = 4;
+        context.strokeText(fullText, 20, canvas.height - 30);
+        context.fillText(fullText, 20, canvas.height - 30);
+
+        photoPreview.src = canvas.toDataURL('image/png');
+        photoPreview.style.display = 'block';
+    }
+
+    // 타이머
+    function startTimer() {
+        startTime = Date.now();
+        timerDisplay.style.display = 'block';
+        timerInterval = setInterval(() => {
+            const diff = Date.now() - startTime;
+            const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
+            const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
+            const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
+            timerDisplay.innerText = `${h}:${m}:${s}`;
+        }, 1000);
+    }
+</script>
+
+</body>
+</html>

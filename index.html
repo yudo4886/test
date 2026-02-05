@@ -64,4 +64,197 @@
         }
         .opt-btn.active { border-color: var(--info); background: #ebf5fb; color: var(--info); }
         textarea { 
-            width: 100%; height: 120px; padding: 12
+            width: 100%; height: 120px; padding: 12px; border-radius: 10px; 
+            border: 1px solid #ccc; font-size: 16px; box-sizing: border-box; resize: none;
+        }
+
+        #shutter { 
+            width: 75px; height: 75px; border-radius: 50%; border: 6px solid white; 
+            background: var(--danger); margin-bottom: 20px;
+        }
+        #preview { position: absolute; top: 10px; right: 10px; width: 70px; border: 2px solid white; border-radius: 5px; display: none; z-index: 1000; }
+    </style>
+</head>
+<body>
+
+<div id="map"></div>
+<img id="preview" alt="미리보기">
+
+<div id="camera-overlay" class="overlay">
+    <video id="video" autoplay playsinline style="width:100%; max-height:75vh;"></video>
+    <canvas id="canvas" style="display:none;"></canvas>
+    <button id="shutter" onclick="takePhoto()"></button>
+    <button class="btn" style="background:transparent; text-decoration:underline;" onclick="closeCamera()">취소</button>
+</div>
+
+<div id="report-overlay" class="overlay">
+    <h2 style="margin: 0 0 5px 0;">📝 상황 보고</h2>
+    <p style="color:#666; font-size:14px; margin-bottom:20px;">현장 내용을 기록해 주세요.</p>
+
+    <span class="report-label">신고방법</span>
+    <div class="opt-group">
+        <div class="opt-btn" onclick="setReportType('112신고', this)">112 신고</div>
+        <div class="opt-btn" onclick="setReportType('120안전', this)">120 안전</div>
+        <div class="opt-btn" onclick="setReportType('신고없음', this)">신고없음</div>
+    </div>
+
+    <span class="report-label">상세 내용 (필수)</span>
+    <textarea id="report-text" placeholder="현장 상황을 상세히 입력해 주세요."></textarea>
+
+    <button class="btn btn-start" style="width:100%; margin-top:20px;" onclick="saveReport()">작성 완료</button>
+</div>
+
+<div class="panel">
+    <div id="timer">00:00:00</div>
+    <div id="address-bar">📍 위치 찾는 중...</div>
+
+    <div class="btn-stack">
+        <button id="start-btn" class="btn btn-start" onclick="openCam('시작')">순찰 시작 인증</button>
+        <button id="cap-btn" class="btn btn-capture" onclick="openCam('현장')">현장 상황 촬영</button>
+        <button id="end-btn" class="btn btn-end" onclick="openCam('종료')">순찰 종료 인증</button>
+        
+        <div class="btn-row">
+            <button onclick="location.href='tel:112'" class="btn btn-emergency">112 신고</button>
+            <button onclick="location.href='tel:120'" class="btn btn-emergency" style="background:var(--warning); color:#333;">120 민원</button>
+        </div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    let map, marker, timerInterval, startTime;
+    let mode = ""; 
+    let selectedType = "";
+    let currentAddr = "위치 정보 없음";
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+
+    // 지도 및 GPS 초기화
+    function init() {
+        map = L.map('map', { zoomControl: false }).setView([37.5665, 126.9780], 17);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        marker = L.marker([37.5665, 126.9780]).addTo(map);
+
+        if (navigator.geolocation) {
+            navigator.geolocation.watchPosition(updatePos, null, { enableHighAccuracy: true });
+        } else {
+            alert("이 브라우저는 GPS를 지원하지 않습니다.");
+        }
+    }
+
+    function updatePos(pos) {
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+        const latlng = [lat, lon];
+        map.setView(latlng);
+        marker.setLatLng(latlng);
+        fetchAddress(lat, lon);
+    }
+
+    // [중요] 주소 변환 (오류 방지 로직 강화)
+    async function fetchAddress(lat, lon) {
+        try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`, {
+                headers: { 'Accept-Language': 'ko-KR' }
+            });
+            const data = await res.json();
+            if(data.display_name) {
+                const parts = data.display_name.split(',');
+                // 한국 주소 특성상 뒤쪽 배열 요소가 큰 지명입니다.
+                currentAddr = parts.slice(0, 3).join(' ').trim();
+                document.getElementById('address-bar').innerText = `📍 ${currentAddr}`;
+            }
+        } catch (e) {
+            console.log("주소 로딩 지연");
+        }
+    }
+
+    // 카메라 제어
+    async function openCam(m) {
+        mode = m;
+        document.getElementById('camera-overlay').style.display = 'flex';
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: "environment" } 
+            });
+            video.srcObject = stream;
+        } catch (e) {
+            alert("카메라 권한을 허용해 주세요.");
+            closeCamera();
+        }
+    }
+
+    function closeCamera() {
+        if (video.srcObject) video.srcObject.getTracks().forEach(track => track.stop());
+        document.getElementById('camera-overlay').style.display = 'none';
+    }
+
+    function takePhoto() {
+        const ctx = canvas.getContext('2d');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0);
+
+        // 워터마크 합성
+        ctx.font = "bold 24px sans-serif";
+        ctx.fillStyle = "yellow";
+        ctx.shadowColor = "black";
+        ctx.shadowBlur = 5;
+        const now = new Date().toLocaleString();
+        ctx.fillText(`${mode} | ${currentAddr}`, 20, canvas.height - 60);
+        ctx.fillText(now, 20, canvas.height - 25);
+
+        document.getElementById('preview').src = canvas.toDataURL('image/png');
+        document.getElementById('preview').style.display = 'block';
+
+        closeCamera();
+
+        // 모드별 후속 조치
+        if (mode === '현장') {
+            document.getElementById('report-overlay').style.display = 'flex';
+        } else if (mode === '시작') {
+            runTimer();
+            document.getElementById('start-btn').style.display = 'none';
+            document.getElementById('end-btn').style.display = 'block';
+        } else if (mode === '종료') {
+            alert("순찰이 종료되었습니다.");
+            location.reload();
+        }
+    }
+
+    // 리포트 기능
+    function setReportType(type, el) {
+        selectedType = type;
+        document.querySelectorAll('.opt-btn').forEach(b => b.classList.remove('active'));
+        el.classList.add('active');
+    }
+
+    function saveReport() {
+        const val = document.getElementById('report-text').value;
+        if (!selectedType) return alert("신고방법을 선택해 주세요.");
+        if (val.trim().length < 2) return alert("상세 내용을 입력해 주세요.");
+
+        alert("보고서가 기록되었습니다.");
+        document.getElementById('report-text').value = "";
+        selectedType = "";
+        document.querySelectorAll('.opt-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('report-overlay').style.display = 'none';
+    }
+
+    // 타이머
+    function runTimer() {
+        startTime = Date.now();
+        timerInterval = setInterval(() => {
+            const d = new Date(Date.now() - startTime);
+            const h = String(d.getUTCHours()).padStart(2, '0');
+            const m = String(d.getUTCMinutes()).padStart(2, '0');
+            const s = String(d.getUTCSeconds()).padStart(2, '0');
+            document.getElementById('timer').innerText = `${h}:${m}:${s}`;
+        }, 1000);
+    }
+
+    window.onload = init;
+</script>
+
+</body>
+</html>

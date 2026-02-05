@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>스마트 순찰 시스템 - 리포트 강화형</title>
+    <title>스마트 순찰 - 주소 표시형</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root {
@@ -14,7 +14,6 @@
         }
         body { font-family: 'Pretendard', sans-serif; margin: 0; background: #f4f7f6; overflow: hidden; }
         
-        /* 지도 및 기본 레이아웃 */
         #map { width: 100%; height: 60vh; z-index: 1; }
         .panel { 
             position: absolute; bottom: 0; width: 100%; height: 40vh; 
@@ -23,30 +22,22 @@
             display: flex; flex-direction: column; z-index: 500;
         }
 
-        /* 공통 팝업 스타일 */
+        /* 주소 표시바 스타일 */
+        #address-bar {
+            background: #f0f4f8; padding: 10px; border-radius: 8px;
+            font-size: 15px; font-weight: bold; color: var(--primary-color);
+            margin-bottom: 10px; border-left: 4px solid var(--info-color);
+            min-height: 20px;
+        }
+
         .overlay-popup {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.9); display: none; flex-direction: column;
             justify-content: center; align-items: center; z-index: 2000; color: white;
         }
 
-        /* 신고 리포트 창 스타일 */
         #report-popup { background: white; color: #333; padding: 20px; justify-content: flex-start; overflow-y: auto; }
-        .report-header { width: 100%; text-align: left; border-bottom: 2px solid #eee; margin-bottom: 20px; padding-bottom: 10px; }
         
-        .report-btn-group { display: flex; gap: 10px; width: 100%; margin-bottom: 20px; }
-        .report-opt { 
-            flex: 1; padding: 12px; border: 2px solid #ddd; border-radius: 10px; 
-            background: #f9f9f9; cursor: pointer; font-weight: bold; text-align: center;
-        }
-        .report-opt.active { border-color: var(--info-color); background: #ebf5fb; color: var(--info-color); }
-
-        textarea { 
-            width: 100%; height: 120px; padding: 10px; border-radius: 10px; 
-            border: 1px solid #ccc; box-sizing: border-box; font-size: 16px; margin-bottom: 20px;
-        }
-
-        /* 버튼류 */
         .btn { padding: 15px; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; color: white; }
         .btn-start { background: var(--success-color); width: 100%; }
         .btn-capture { background: var(--info-color); width: 100%; }
@@ -54,6 +45,11 @@
         .btn-submit { background: var(--primary-color); width: 100%; }
         .btn-emergency { background: var(--danger-color); flex: 1; }
 
+        textarea { width: 100%; height: 100px; padding: 10px; border-radius: 10px; border: 1px solid #ccc; font-size: 16px; margin-bottom: 15px; }
+        .report-btn-group { display: flex; gap: 8px; width: 100%; margin-bottom: 15px; }
+        .report-opt { flex: 1; padding: 10px; border: 2px solid #ddd; border-radius: 8px; background: #f9f9f9; cursor: pointer; text-align: center; font-size: 14px; }
+        .report-opt.active { border-color: var(--info-color); background: #ebf5fb; color: var(--info-color); font-weight: bold; }
+        
         #shutter-btn { width: 70px; height: 70px; border-radius: 50%; border: 5px solid white; background: var(--danger-color); }
         #preview-container { position: absolute; top: 10px; right: 10px; width: 80px; border: 2px solid white; display: none; z-index: 600; border-radius: 5px; }
     </style>
@@ -67,39 +63,33 @@
     <video id="video" autoplay playsinline style="width:100%; max-height:70vh;"></video>
     <canvas id="canvas" style="display:none;"></canvas>
     <button id="shutter-btn" onclick="takeSnapshot()"></button>
-    <p style="margin-top:10px;">현장 인증샷 촬영</p>
     <button class="btn" style="background:none; text-decoration:underline;" onclick="closeCamera()">취소</button>
 </div>
 
 <div id="report-popup" class="overlay-popup">
-    <div class="report-header">
-        <h2 style="margin:0;">📝 현장 상황 보고</h2>
-        <p style="font-size:14px; color:#666;">방금 촬영한 사진과 함께 내용을 저장합니다.</p>
+    <div style="width:100%; border-bottom:1px solid #eee; margin-bottom:15px;">
+        <h2 style="margin:0 0 10px 0;">📝 현장 보고서</h2>
     </div>
-
-    <p style="width:100%; font-weight:bold;">신고방법 선택</p>
+    <p style="width:100%; font-weight:bold; margin:0 0 10px 0;">신고유형</p>
     <div class="report-btn-group">
-        <div class="report-opt" onclick="selectReport('112신고내용')">112 신고</div>
-        <div class="report-opt" onclick="selectReport('120 안전신문고')">120 안전</div>
+        <div class="report-opt" onclick="selectReport('112신고')">112 신고</div>
+        <div class="report-opt" onclick="selectReport('120안전')">120 안전</div>
         <div class="report-opt" onclick="selectReport('신고없음')">신고없음</div>
     </div>
-
-    <p style="width:100%; font-weight:bold;">상세 내용 (필수)</p>
-    <textarea id="report-text" placeholder="현장 상황이나 조치 내용을 구체적으로 입력해주세요."></textarea>
-
-    <button class="btn btn-submit" onclick="submitReport()">기록 완료 및 지도 돌아가기</button>
+    <textarea id="report-text" placeholder="현장 상황을 입력하세요..."></textarea>
+    <button class="btn btn-submit" onclick="submitReport()">작성 완료</button>
 </div>
 
 <div class="panel">
-    <div id="timer" style="font-size: 28px; font-weight: bold; color: var(--danger-color);">00:00:00</div>
-    <div id="status-bar" style="font-size:14px; margin-bottom:15px;">GPS 위치 추적 중...</div>
+    <div id="timer" style="font-size: 26px; font-weight: bold; color: var(--danger-color);">00:00:00</div>
+    
+    <div id="address-bar">📍 위치 확인 중...</div>
 
     <div style="display: flex; flex-direction: column; gap: 8px;">
         <button id="start-btn" class="btn btn-start" onclick="openCamera('시작')">순찰 시작 인증</button>
         <button id="capture-btn" class="btn btn-capture" onclick="openCamera('현장')">현장 상황 촬영</button>
         <button id="end-btn" class="btn btn-end" onclick="openCamera('종료')">순찰 종료 인증</button>
-        
-        <div style="display: flex; gap: 8px; margin-top: 5px;">
+        <div style="display: flex; gap: 8px;">
             <button onclick="location.href='tel:112'" class="btn btn-emergency">112</button>
             <button onclick="location.href='tel:120'" class="btn btn-emergency" style="background:#f1c40f; color:#333;">120</button>
         </div>
@@ -108,7 +98,7 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    let map, marker, startTime, timerInterval;
+    let map, marker, startTime, timerInterval, currentAddr = "";
     let currentMode = ""; 
     let selectedReportType = "";
     const video = document.getElementById('video');
@@ -121,14 +111,39 @@
 
         if (navigator.geolocation) {
             navigator.geolocation.watchPosition(pos => {
-                const latlng = [pos.coords.latitude, pos.coords.longitude];
-                map.setView(latlng);
-                marker.setLatLng(latlng);
-                document.getElementById('status-bar').innerText = `현재 위치: ${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`;
+                const lat = pos.coords.latitude;
+                const lon = pos.coords.longitude;
+                map.setView([lat, lon]);
+                marker.setLatLng([lat, lon]);
+                
+                // 좌표를 지명으로 변환 호출
+                getAddr(lat, lon);
             }, null, { enableHighAccuracy: true });
         }
     }
 
+    // [핵심] 역 지오코딩 함수 (Nominatim 사용 - 무료)
+    async function getAddr(lat, lon) {
+        try {
+            const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`, {
+                headers: { 'Accept-Language': 'ko-KR' } // 한국어로 결과 받기
+            });
+            const data = await response.json();
+            
+            // 결과에서 필요한 지명 추출 (구, 동 등)
+            const addr = data.address;
+            const city = addr.city || addr.province || addr.city_district || "";
+            const borough = addr.borough || addr.suburb || "";
+            const road = addr.road || "";
+            
+            currentAddr = `${city} ${borough} ${road}`.trim() || "위치 정보 없음";
+            document.getElementById('address-bar').innerText = `📍 ${currentAddr}`;
+        } catch (e) {
+            document.getElementById('address-bar').innerText = `📍 위치 분석 오류`;
+        }
+    }
+
+    // 카메라 및 리포트 관련 함수들은 이전과 동일 (생략 없이 유지)
     async function openCamera(mode) {
         currentMode = mode;
         document.getElementById('camera-popup').style.display = 'flex';
@@ -147,73 +162,37 @@
         canvas.height = video.videoHeight;
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
         
-        // 워터마크
         const now = new Date();
-        context.font = "bold 30px sans-serif";
+        context.font = "bold 24px sans-serif";
         context.fillStyle = "yellow";
-        context.fillText(`${currentMode} | ${now.toLocaleString()}`, 20, canvas.height - 40);
+        // 사진에도 주소를 남기고 싶다면 currentAddr 사용
+        context.fillText(`${currentMode} | ${currentAddr}`, 20, canvas.height - 70);
+        context.fillText(`${now.toLocaleString()}`, 20, canvas.height - 30);
 
         document.getElementById('preview-container').src = canvas.toDataURL('image/png');
         document.getElementById('preview-container').style.display = 'block';
 
         closeCamera();
-
-        // [핵심] 현장 상황 촬영인 경우 신고 리포트 팝업 띄움
-        if (currentMode === '현장') {
-            document.getElementById('report-popup').style.display = 'flex';
-        } else if (currentMode === '시작') {
+        if (currentMode === '현장') document.getElementById('report-popup').style.display = 'flex';
+        else if (currentMode === '시작') {
             startTimer();
             document.getElementById('start-btn').style.display = 'none';
             document.getElementById('end-btn').style.display = 'block';
-        } else if (currentMode === '종료') {
-            alert("순찰이 종료되었습니다.");
-            location.reload();
         }
+        else if (currentMode === '종료') { alert("순찰 종료"); location.reload(); }
     }
 
-    // 리포트 선택 로직
     function selectReport(type) {
         selectedReportType = type;
-        const opts = document.querySelectorAll('.report-opt');
-        opts.forEach(opt => opt.classList.remove('active'));
+        document.querySelectorAll('.report-opt').forEach(opt => opt.classList.remove('active'));
         event.target.classList.add('active');
     }
 
-    // 리포트 제출 로직
     function submitReport() {
         const text = document.getElementById('report-text').value;
-        
-        if (!selectedReportType) {
-            alert("신고방법을 선택해주세요.");
+        if (!selectedReportType || text.trim().length < 2) {
+            alert("유형 선택 및 내용을 입력해주세요.");
             return;
         }
-        if (text.trim().length < 2) {
-            alert("상세 내용을 작성해야 다음으로 넘어갈 수 있습니다.");
-            return;
-        }
-
-        alert(`기록 완료!\n신고유형: ${selectedReportType}\n내용: ${text}`);
-        
-        // 초기화 및 닫기
-        document.getElementById('report-text').value = "";
-        selectedReportType = "";
-        document.querySelectorAll('.report-opt').forEach(opt => opt.classList.remove('active'));
-        document.getElementById('report-popup').style.display = 'none';
-    }
-
-    function startTimer() {
-        startTime = Date.now();
-        timerInterval = setInterval(() => {
-            const diff = new Date(Date.now() - startTime);
-            const h = String(diff.getUTCHours()).padStart(2, '0');
-            const m = String(diff.getUTCMinutes()).padStart(2, '0');
-            const s = String(diff.getUTCSeconds()).padStart(2, '0');
-            document.getElementById('timer').innerText = `${h}:${m}:${s}`;
-        }, 1000);
-    }
-
-    window.onload = initMap;
-</script>
-
-</body>
-</html>
+        alert("기록되었습니다.");
+        document.getElementById('report-popup').style

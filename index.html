@@ -6,72 +6,25 @@
     <title>스마트 순찰 시스템</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        :root {
-            --primary: #2c3e50;
-            --danger: #e74c3c;
-            --success: #27ae60;
-            --info: #3498db;
-            --warning: #f1c40f;
-        }
-        body { font-family: 'Pretendard', sans-serif; margin: 0; background: #f4f7f6; overflow: hidden; touch-action: none; }
-        
-        /* 레이아웃 */
+        :root { --primary: #2c3e50; --danger: #e74c3c; --success: #27ae60; --info: #3498db; --warning: #f1c40f; }
+        body { font-family: 'Pretendard', sans-serif; margin: 0; background: #f4f7f6; overflow: hidden; }
         #map { width: 100%; height: 60vh; z-index: 1; }
-        .panel { 
-            position: absolute; bottom: 0; width: 100%; height: 40vh; 
-            background: white; border-radius: 20px 20px 0 0; 
-            box-shadow: 0 -5px 15px rgba(0,0,0,0.1); padding: 15px; box-sizing: border-box;
-            display: flex; flex-direction: column; z-index: 500;
-        }
-
-        /* 위치/타이머 정보 */
+        .panel { position: absolute; bottom: 0; width: 100%; height: 40vh; background: white; border-radius: 20px 20px 0 0; box-shadow: 0 -5px 15px rgba(0,0,0,0.1); padding: 15px; box-sizing: border-box; display: flex; flex-direction: column; z-index: 500; }
         #timer { font-size: 28px; font-weight: bold; color: var(--danger); margin-bottom: 5px; }
-        #address-bar {
-            background: #f0f4f8; padding: 10px; border-radius: 8px;
-            font-size: 15px; font-weight: bold; color: var(--primary);
-            margin-bottom: 12px; border-left: 4px solid var(--info);
-            min-height: 20px; word-break: keep-all;
-        }
-
-        /* 버튼 그룹 */
+        #address-bar { background: #f0f4f8; padding: 10px; border-radius: 8px; font-size: 15px; font-weight: bold; color: var(--primary); margin-bottom: 12px; border-left: 4px solid var(--info); min-height: 20px; }
         .btn-stack { display: flex; flex-direction: column; gap: 8px; }
-        .btn-row { display: flex; gap: 8px; }
-        .btn { 
-            padding: 16px; border: none; border-radius: 12px; 
-            font-size: 17px; font-weight: bold; cursor: pointer; color: white;
-            transition: 0.2s;
-        }
-        .btn:active { transform: scale(0.98); opacity: 0.9; }
-        .btn-start { background: var(--success); }
-        .btn-capture { background: var(--info); }
-        .btn-end { background: var(--primary); display: none; }
+        .btn { padding: 16px; border: none; border-radius: 12px; font-size: 17px; font-weight: bold; cursor: pointer; color: white; transition: 0.2s; }
+        .btn-start { background: var(--success); width: 100%; }
+        .btn-capture { background: var(--info); width: 100%; }
+        .btn-end { background: var(--primary); width: 100%; display: none; }
         .btn-emergency { background: var(--danger); flex: 1; }
-
-        /* 팝업 오버레이 */
-        .overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: white; display: none; flex-direction: column;
-            z-index: 2000; padding: 20px; box-sizing: border-box;
-        }
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; display: none; flex-direction: column; z-index: 2000; padding: 20px; box-sizing: border-box; }
         #camera-overlay { background: black; justify-content: center; align-items: center; }
-        
-        /* 리포트 양식 */
-        .report-label { font-weight: bold; margin: 15px 0 8px 0; display: block; }
         .opt-group { display: flex; gap: 8px; margin-bottom: 15px; }
-        .opt-btn { 
-            flex: 1; padding: 12px; border: 2px solid #ddd; border-radius: 10px; 
-            background: #f9f9f9; text-align: center; cursor: pointer; font-weight: bold;
-        }
+        .opt-btn { flex: 1; padding: 12px; border: 2px solid #ddd; border-radius: 10px; background: #f9f9f9; text-align: center; cursor: pointer; font-weight: bold; color: #333; }
         .opt-btn.active { border-color: var(--info); background: #ebf5fb; color: var(--info); }
-        textarea { 
-            width: 100%; height: 120px; padding: 12px; border-radius: 10px; 
-            border: 1px solid #ccc; font-size: 16px; box-sizing: border-box; resize: none;
-        }
-
-        #shutter { 
-            width: 75px; height: 75px; border-radius: 50%; border: 6px solid white; 
-            background: var(--danger); margin-bottom: 20px;
-        }
+        textarea { width: 100%; height: 120px; padding: 12px; border-radius: 10px; border: 1px solid #ccc; font-size: 16px; box-sizing: border-box; resize: none; margin-bottom: 15px; }
+        #shutter { width: 75px; height: 75px; border-radius: 50%; border: 6px solid white; background: var(--danger); margin-bottom: 20px; }
         #preview { position: absolute; top: 10px; right: 10px; width: 70px; border: 2px solid white; border-radius: 5px; display: none; z-index: 1000; }
     </style>
 </head>
@@ -81,167 +34,140 @@
 <img id="preview" alt="미리보기">
 
 <div id="camera-overlay" class="overlay">
-    <video id="video" autoplay playsinline style="width:100%; max-height:75vh;"></video>
+    <video id="video" autoplay playsinline style="width:100%; max-height:70vh;"></video>
     <canvas id="canvas" style="display:none;"></canvas>
     <button id="shutter" onclick="takePhoto()"></button>
-    <button class="btn" style="background:transparent; text-decoration:underline;" onclick="closeCamera()">취소</button>
+    <button class="btn" style="background:transparent; text-decoration:underline; color:white;" onclick="closeCamera()">취소</button>
 </div>
 
 <div id="report-overlay" class="overlay">
-    <h2 style="margin: 0 0 5px 0;">📝 상황 보고</h2>
-    <p style="color:#666; font-size:14px; margin-bottom:20px;">현장 내용을 기록해 주세요.</p>
-
-    <span class="report-label">신고방법</span>
+    <h2>📝 현장 상황 보고</h2>
+    <p>신고방법 선택 (필수)</p>
     <div class="opt-group">
         <div class="opt-btn" onclick="setReportType('112신고', this)">112 신고</div>
         <div class="opt-btn" onclick="setReportType('120안전', this)">120 안전</div>
         <div class="opt-btn" onclick="setReportType('신고없음', this)">신고없음</div>
     </div>
-
-    <span class="report-label">상세 내용 (필수)</span>
-    <textarea id="report-text" placeholder="현장 상황을 상세히 입력해 주세요."></textarea>
-
-    <button class="btn btn-start" style="width:100%; margin-top:20px;" onclick="saveReport()">작성 완료</button>
+    <p>상세 내용 (필수)</p>
+    <textarea id="report-text" placeholder="현장 상황을 기록하세요..."></textarea>
+    <button class="btn btn-start" onclick="saveReport()">보고서 저장 및 완료</button>
 </div>
 
 <div class="panel">
     <div id="timer">00:00:00</div>
-    <div id="address-bar">📍 위치 찾는 중...</div>
-
+    <div id="address-bar">📍 위치 확인 중...</div>
     <div class="btn-stack">
         <button id="start-btn" class="btn btn-start" onclick="openCam('시작')">순찰 시작 인증</button>
         <button id="cap-btn" class="btn btn-capture" onclick="openCam('현장')">현장 상황 촬영</button>
         <button id="end-btn" class="btn btn-end" onclick="openCam('종료')">순찰 종료 인증</button>
-        
-        <div class="btn-row">
-            <button onclick="location.href='tel:112'" class="btn btn-emergency">112 신고</button>
-            <button onclick="location.href='tel:120'" class="btn btn-emergency" style="background:var(--warning); color:#333;">120 민원</button>
+        <div style="display: flex; gap: 8px;">
+            <button onclick="location.href='tel:112'" class="btn btn-emergency">112</button>
+            <button onclick="location.href='tel:120'" class="btn btn-emergency" style="background:var(--warning); color:#333;">120</button>
         </div>
     </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+    // [설정] 복사한 본인의 정보를 아래에 넣으세요
+    const SUPABASE_URL = '복사한_프로젝트_URL'; 
+    const SUPABASE_KEY = '복사한_anon_키';
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
     let map, marker, timerInterval, startTime;
-    let mode = ""; 
-    let selectedType = "";
-    let currentAddr = "위치 정보 없음";
+    let mode = "", selectedType = "", currentAddr = "위치 정보 없음", lastPhotoUrl = "";
     const video = document.getElementById('video');
     const canvas = document.getElementById('canvas');
 
-    // 지도 및 GPS 초기화
-    function init() {
+    function initMap() {
         map = L.map('map', { zoomControl: false }).setView([37.5665, 126.9780], 17);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
         marker = L.marker([37.5665, 126.9780]).addTo(map);
-
         if (navigator.geolocation) {
-            navigator.geolocation.watchPosition(updatePos, null, { enableHighAccuracy: true });
-        } else {
-            alert("이 브라우저는 GPS를 지원하지 않습니다.");
+            navigator.geolocation.watchPosition(pos => {
+                const lat = pos.coords.latitude, lon = pos.coords.longitude;
+                map.setView([lat, lon]); marker.setLatLng([lat, lon]);
+                fetchAddr(lat, lon);
+            }, null, { enableHighAccuracy: true });
         }
     }
 
-    function updatePos(pos) {
-        const lat = pos.coords.latitude;
-        const lon = pos.coords.longitude;
-        const latlng = [lat, lon];
-        map.setView(latlng);
-        marker.setLatLng(latlng);
-        fetchAddress(lat, lon);
-    }
-
-    // [중요] 주소 변환 (오류 방지 로직 강화)
-    async function fetchAddress(lat, lon) {
+    async function fetchAddr(lat, lon) {
         try {
-            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`, {
-                headers: { 'Accept-Language': 'ko-KR' }
-            });
+            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`, { headers: { 'Accept-Language': 'ko-KR' } });
             const data = await res.json();
-            if(data.display_name) {
+            if (data.display_name) {
                 const parts = data.display_name.split(',');
-                // 한국 주소 특성상 뒤쪽 배열 요소가 큰 지명입니다.
                 currentAddr = parts.slice(0, 3).join(' ').trim();
                 document.getElementById('address-bar').innerText = `📍 ${currentAddr}`;
             }
-        } catch (e) {
-            console.log("주소 로딩 지연");
-        }
+        } catch (e) {}
     }
 
-    // 카메라 제어
     async function openCam(m) {
-        mode = m;
-        document.getElementById('camera-overlay').style.display = 'flex';
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: "environment" } 
-            });
-            video.srcObject = stream;
-        } catch (e) {
-            alert("카메라 권한을 허용해 주세요.");
-            closeCamera();
-        }
+        mode = m; document.getElementById('camera-overlay').style.display = 'flex';
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        video.srcObject = stream;
     }
 
     function closeCamera() {
-        if (video.srcObject) video.srcObject.getTracks().forEach(track => track.stop());
+        if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
         document.getElementById('camera-overlay').style.display = 'none';
     }
 
-    function takePhoto() {
+    async function takePhoto() {
         const ctx = canvas.getContext('2d');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
+        canvas.width = video.videoWidth; canvas.height = video.videoHeight;
         ctx.drawImage(video, 0, 0);
-
-        // 워터마크 합성
-        ctx.font = "bold 24px sans-serif";
-        ctx.fillStyle = "yellow";
-        ctx.shadowColor = "black";
-        ctx.shadowBlur = 5;
-        const now = new Date().toLocaleString();
+        ctx.font = "bold 24px sans-serif"; ctx.fillStyle = "yellow";
         ctx.fillText(`${mode} | ${currentAddr}`, 20, canvas.height - 60);
-        ctx.fillText(now, 20, canvas.height - 25);
-
-        document.getElementById('preview').src = canvas.toDataURL('image/png');
+        ctx.fillText(new Date().toLocaleString(), 20, canvas.height - 25);
+        
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+        document.getElementById('preview').src = dataUrl;
         document.getElementById('preview').style.display = 'block';
-
-        closeCamera();
-
-        // 모드별 후속 조치
-        if (mode === '현장') {
-            document.getElementById('report-overlay').style.display = 'flex';
-        } else if (mode === '시작') {
-            runTimer();
-            document.getElementById('start-btn').style.display = 'none';
-            document.getElementById('end-btn').style.display = 'block';
-        } else if (mode === '종료') {
-            alert("순찰이 종료되었습니다.");
-            location.reload();
+        
+        // Supabase 업로드
+        const blob = await (await fetch(dataUrl)).blob();
+        const fileName = `img_${Date.now()}.jpg`;
+        const { data, error } = await supabase.storage.from('patrol-photos').upload(`public/${fileName}`, blob);
+        
+        if (data) {
+            const { data: urlData } = supabase.storage.from('patrol-photos').getPublicUrl(`public/${fileName}`);
+            lastPhotoUrl = urlData.publicUrl;
+            if (mode === '현장') document.getElementById('report-overlay').style.display = 'flex';
+            else {
+                await saveDB();
+                if (mode === '시작') { runTimer(); document.getElementById('start-btn').style.display = 'none'; document.getElementById('end-btn').style.display = 'block'; }
+                if (mode === '종료') { alert("순찰 종료"); location.reload(); }
+            }
         }
+        closeCamera();
     }
 
-    // 리포트 기능
-    function setReportType(type, el) {
-        selectedType = type;
+    async function saveDB(rType = "", rText = "") {
+        await supabase.from('patrol_records').insert([{
+            mode: mode, address: currentAddr, photo_url: lastPhotoUrl,
+            report_type: rType, report_text: rText, duration: document.getElementById('timer').innerText
+        }]);
+    }
+
+    function setReportType(t, el) {
+        selectedType = t;
         document.querySelectorAll('.opt-btn').forEach(b => b.classList.remove('active'));
         el.classList.add('active');
     }
 
-    function saveReport() {
+    async function saveReport() {
         const val = document.getElementById('report-text').value;
-        if (!selectedType) return alert("신고방법을 선택해 주세요.");
-        if (val.trim().length < 2) return alert("상세 내용을 입력해 주세요.");
-
-        alert("보고서가 기록되었습니다.");
-        document.getElementById('report-text').value = "";
-        selectedType = "";
-        document.querySelectorAll('.opt-btn').forEach(b => b.classList.remove('active'));
+        if (!selectedType || val.trim().length < 2) return alert("내용을 입력하세요.");
+        await saveDB(selectedType, val);
+        alert("기록 완료");
         document.getElementById('report-overlay').style.display = 'none';
+        document.getElementById('report-text').value = "";
     }
 
-    // 타이머
     function runTimer() {
         startTime = Date.now();
         timerInterval = setInterval(() => {
@@ -252,9 +178,7 @@
             document.getElementById('timer').innerText = `${h}:${m}:${s}`;
         }, 1000);
     }
-
-    window.onload = init;
+    window.onload = initMap;
 </script>
-
 </body>
 </html>

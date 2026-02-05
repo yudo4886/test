@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>순찰 관리자 패널</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f4f7f6; }
+        .log-card { background: white; border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 12px; display: flex; gap: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .thumb { width: 150px; height: 150px; object-fit: cover; border-radius: 8px; border: 1px solid #eee; }
+        .info { flex: 1; }
+        .badge { display: inline-block; background: #e74c3c; color: white; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; margin-bottom: 8px; }
+        .time { color: #888; font-size: 13px; }
+        h1 { color: #2c3e50; }
+    </style>
+</head>
+<body>
+    <h1>📋 순찰 기록 통합 관리자</h1>
+    <div id="log-list">기록을 불러오는 중...</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        // [설정] index.html과 똑같은 정보를 넣으세요
+        const SUPABASE_URL = '복사한_프로젝트_URL'; 
+        const SUPABASE_KEY = '복사한_anon_키';
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        async function fetchLogs() {
+            const { data, error } = await supabase
+                .from('patrol_records')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            const listEl = document.getElementById('log-list');
+            if (error) { listEl.innerText = "데이터를 불러오지 못했습니다."; return; }
+            if (data.length === 0) { listEl.innerText = "저장된 순찰 기록이 없습니다."; return; }
+
+            listEl.innerHTML = data.map(log => `
+                <div class="log-card">
+                    <a href="${log.photo_url}" target="_blank">
+                        <img src="${log.photo_url}" class="thumb">
+                    </a>
+                    <div class="info">
+                        <div class="time">${new Date(log.created_at).toLocaleString()}</div>
+                        <h3 style="margin: 5px 0;">[${log.mode}] 순찰 기록</h3>
+                        <p style="margin: 5px 0;">📍 ${log.address}</p>
+                        <p style="margin: 5px 0; color: #666;">⏱ 경과 시간: ${log.duration}</p>
+                        ${log.report_type ? `
+                            <div style="margin-top:10px; padding:10px; background:#fff5f5; border-radius:8px;">
+                                <span class="badge">${log.report_type}</span><br>
+                                <strong>내용:</strong> ${log.report_text}
+                            </div>
+                        ` : ""}
+                    </div>
+                </div>
+            `).join('');
+        }
+        window.onload = fetchLogs;
+    </script>
+</body>
+</html>
